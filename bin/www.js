@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /**
  * Module dependencies.
  */
@@ -26,8 +24,9 @@ const mongoose = require('mongoose');
 mongoose.Promise = require('bluebird');
 mongoose.connect('mongodb://localhost:27017/reaktor2019-summer', { promiseLibrary: require('bluebird') })
   .then(() => {
-    console.log('connection successful')
-    populateDB();
+    console.log('Connection to DB successful!')
+    //get the population csv
+    populateDB("http://api.worldbank.org/v2/en/indicator/SP.POP.TOTL?downloadformat=csv", "./data/population-api.zip", "population");
   })
   .catch((err) => console.error(err));
 
@@ -36,114 +35,221 @@ mongoose.connect('mongodb://localhost:27017/reaktor2019-summer', { promiseLibrar
 //TODO error handling
 //////////////////////////////////////////
 
+//TODO autoupdating db every week
 
 
 //function for populating the db
-function populateDB() {
+function populateDB(getUrl, destUri, type) {
+  console.log("Get request to:", getUrl)
   //downloads the population zip from the worldbank api to the data directory
-  const uri = "./data/population-api.zip";
-  const file = fs.createWriteStream(uri);
-  http.get("http://api.worldbank.org/v2/en/indicator/SP.POP.TOTL?downloadformat=csv", function (response) {
+  const location = path.join(__dirname, "/../data");
+  const file = fs.createWriteStream(destUri);
+  http.get(getUrl, function (response) {
     response.pipe(file);
     file.on('finish', function () {
       file.close(function () {
         //unzip the contents to data folder after file has been loaded and closed
-        extract(uri, { dir: path.join(__dirname, "/../data") }, function (err) {
+        extract(destUri, { dir: location }, function (err) {
           // handle error
-          console.error(err);
 
-          fs.readdir(location2, function (err, items) {
-            readCSV(path.join(location2, items[1]), "population");
+          fs.readdir(location, function (err, items) {
+            if (err) {
+              console.error("Error reading directory:", err);
+            }
+            //after first iteration, call the same function ass callback
+            let filename = ""
+            //ensure that we access the right csv
+            if (type == "population") {
+              filename = items.find(function (item) {
+                return item.includes("API_SP.POP.TOTL")
+              })
+            } else {
+              filename = items.find(function (item) {
+                return item.includes("API_EN.ATM.CO2E")
+              })
+            }
+            queryDocuments(path.join(location, filename),
+              type,
+              function () {
+                populateDB("http://api.worldbank.org/v2/en/indicator/EN.ATM.CO2E.KT?downloadformat=csv",
+                  "./data/emissions-api.zip", "emissions")
+              }
+            );
           })
-        })
-      });
-    });
-  });
-
-
-  //downloads the CO2 emissions zip from the worldbank api to the data directory
-  const destUri = "./data/emissions-api.zip";
-  const location2 = path.join(__dirname, "/../data");
-  const file2 = fs.createWriteStream(destUri);
-  http.get("http://api.worldbank.org/v2/en/indicator/EN.ATM.CO2E.KT?downloadformat=csv", function (response) {
-    response.pipe(file2);
-    file2.on('finish', function () {
-      file2.close(function () {
-        //unzip the contents to data folder after file has been loaded and closed
-        extract(destUri, { dir: location2 }, function (err) {
-          // handle error
-          console.error(err);
-
-          fs.readdir(location2, function (err, items) {
-            readCSV(path.join(location2, items[0]), "emissions");
-          })
-
         })
       });
     });
   });
 }
+
+
+function queryDocuments(uri, type, cb) {
+  //if db is still empty
+  let dbEmpty = false;
+  //variable for db data;
+  let dbDocuments = [];
+  //get all documents from db and save them to array
+  //also turn the mongoose model to js object
+  Country.find().lean().exec(function (err, countries) {
+    if (err) { console.error("Something went wrong when accessing documents from db.", err) }
+    else if (countries.length === 0) {
+      console.log("Database is empty, populating database...");
+      dbEmpty = true;
+      readCSV(uri, type, dbEmpty, dbDocuments, cb);
+    }
+    else {
+      console.log("Documents queried, checking data...");
+      dbDocuments = countries;
+      readCSV(uri, type, dbEmpty, dbDocuments, cb);
+    }
+  })
+}
+
 //read the csv file
 
-function readCSV(uri, type) {
+function readCSV(uri, type, dbEmpty, dbDocuments, cb) {
   //variable to check the header row 
   let firstCorrect = 0;
-  //array to save the corresponging column index with the header
-  let indexToHeader = [];
-  //let's read the csv file
+  //array to save the corresponging column index with the year
+  let indexToYear = [];
+  //data of the current country 
+  let country;
+  //let's read the csv 
   csv
     .fromPath(uri)
     .on("data", function (data) {
-      //first try to find an existing entry if first csv-file has already been gone through
-
-      // CONTINUE HERE!!!!!!!!!!
-      Country.findOne({ countryCode: data[1] }, function (err, country) {
-        console.log(country);
-      });
-
       //if row's length greater than 4, we have found our header row
       if (data.length > 4) {
         firstCorrect++;
       }
-      //save the index with the right header to the array
+      //save the index with the right year to the array
       if (firstCorrect == 1) {
-        for (var i = 0; i < data.length; i++) {
-          indexToHeader.push({
+        for (let i = 0; i < data.length; i++) {
+          indexToYear.push({
             index: i,
-            header: data[i]
+            year: data[i]
           })
         }
       }
-      //data starts after the header row
-      if (firstCorrect > 1) {
-        let countryObject = {
-          name: data[0],
-          countryCode: data[1],
-          data: []
+      else if (firstCorrect > 1) {
+        //try to find the first element of the filtered list based on country code
+        if (dbDocuments.length > 0) {
+          country = dbDocuments.find(function (element) {
+            return element.countryCode === data[1];
+          });
         }
-        //we don't need data[2] and data[3], because the years start at index 4
-        for (var i = 4; i < data.length; i++) {
-          if (type === "emissions") {
-            countryObject.data.push({
-              year: indexToHeader[i].header,
-              emissions: data[i]
-            })
-          } else if (type === "population") {
-            //countryObject.data.push({})
+
+        //if there is no db entry of the current country, let's add it.
+        if (!country) {
+          //data starts after the header row
+          let countryObject = {
+            name: data[0],
+            countryCode: data[1],
+            data: []
+          }
+          //years start at index 4
+          for (let i = 4; i < data.length; i++) {
+            let obj = {}
+            obj.year = indexToYear[i].year;
+            obj[type] = data[i];
+            countryObject.data.push(obj);
+          }
+          //save the country to dbDocuments
+          dbDocuments.push(countryObject);
+        }
+        //if a db entry is found, validate the data
+        else if (!dbEmpty && country) {
+          //let's create a copy of the returned object
+          let countryCopy = Object.assign({}, country);
+          //checks if data has been assigned to entry
+          //type is either "emissions" or "population"
+          if (countryCopy.data[0].hasOwnProperty(type)) {
+            //checks that the values are correct
+            let valuesUpdated = false;
+            for (let i = 0; i < countryCopy.data.length; i++) {
+              const correctIndexForYear = indexToYear.find(function (obj) {
+                return Number(obj.year) === countryCopy.data[i].year
+              });
+              //if no correct index is found, aka filter returns array with length 0
+              if (correctIndexForYear.length === 0) {
+                console.log("Something is wrong with the indexToYear array.")
+              }
+              //if data is correct, continue
+              else if (countryCopy.data[i][type] === Number(data[correctIndexForYear.index])) {
+                //data is correct
+                continue;
+              }
+              else {
+                //data is not correct
+                //update the data
+                countryCopy.data[i] = Object.assign({}, countryCopy.data[i], data[correctIndexForYear.index]);
+                valuesUpdated = true;
+              }
+            }
+            //if we updated the values, update the dbDocuments array
+            if (valuesUpdated) {
+              for (let i = 0; i < dbDocuments.length; i++) {
+                if (dbDocuments[i].countryCode === countryCopy.countryCode) {
+                  dbDocuments[i] = countryCopy;
+                }
+              }
+            }
+          }
+          //entry doesn't have the current property, so let's add it  
+          else {
+            //for loop goes through every element in the data array
+            for (let i = 0; i < countryCopy.data.length; i++) {
+              const correctIndexForYear = indexToYear.find(function (obj) {
+                return Number(obj.year) === countryCopy.data[i].year
+              });
+              countryCopy.data[i][type] = data[correctIndexForYear.index]
+            }
+            //update the entry
+            for (let i = 0; i < dbDocuments.length; i++) {
+              if (dbDocuments[i].countryCode === countryCopy.countryCode) {
+                dbDocuments[i] = countryCopy;
+              }
+            }
           }
         }
-        //console.log(countryObject)
-        //save the country to mongodb
-        Country.create(countryObject, function (err, country) {
-          if (err) return next(err);
-          // saved!
-        });
       }
     })
     .on("end", function () {
-      //console.log(indexToHeader);
+      if (dbEmpty) {
+        Country.insertMany(dbDocuments, function (err) {
+          if (err) {
+            console.error("Something went wrong when inserting to db:", err)
+          } else {
+            console.log("First insertion to db done.");
+            if (type === "population") {
+              cb();
+            }
+          }
+        })
+      } else {
+        dbDocuments.forEach(function (country, i, array) {
+          Country.update({ "_id": country._id }, { "$set": { "data": country.data } }, function (err) {
+            if (err) {
+              console.error("Something went wrong when inserting to db:", err)
+            }
+            else {
+              //otherwise success
+              //callback if only the first csv-file has been gone through
+              if (type === "population" && i === array.length - 1) {
+                cb();
+              } else if (type === "emissions" && i === array.length - 1) {
+                console.log("DB operations are done!")
+                console.log("WOHOO")
+              }
+            }
+          }
+          )
+        }
+        )
+      }
     });
 }
+
 
 /**
  * Create HTTP server.
