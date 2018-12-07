@@ -11,7 +11,7 @@ const CountrySchema = new Schema({
         //population on that year
         population: Number,
         //emissions on that year
-        emissions: Number
+        emissions: Number,
     }]
 });
 
