@@ -17,22 +17,20 @@ All responses will be in JSON format
 - returns only the name and the country code of the countries
 
 
-/country/:countryCode
+/country/code/:countryCode
 
 - replace ':countryCode' with any country code and response will be the data of that country
-- for example /country/FIN returns data of Finland
+- for example /country/code/FIN returns data of Finland in a single JSON object
+- you can get multiple countries at once with '+'-sign, just chain the country codes together, for example /country/code/FIN+SWE+RUS returns data of Finland, Sweden and Russia in an array of JSON objects.
+- number of countries you can get at once is unlimited
 
-/twocountries/code/:countryCode1.:countryCode2
+/country/name/:name
 
-- replace ':countryCode1' and ':countryCode2' with any country code and response will be the data of those two countries
-- for example /country/FIN.SWE returns data of Finland and Sweden
-- takes only two parameters, countryCode1 and countryCode2
+- replace ':name' with any country name and response will be the data of that country (empty spaces have to be '_').
+- for example /country/name/Finland returns data of Finland in a single JSON object.
+- you can get multiple countries at once with '+'-sign, just chain the country names together, for example /country/name/Finland+Sweden+Russian_Federation returns data of Finland, Sweden and Russia in an array of JSON objects.
+- number of countries you can get at once is unlimited
 
-/twocountries/name/:name1.:name2
-
-- replace ':name1' and ':name2' with any country name and response will be the data of those two countries
-- for example /country/Finland.Sweden returns data of Finland and Sweden
-- takes only two parameters, name1 and name2
 
 /countrycodes
 

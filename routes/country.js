@@ -19,30 +19,42 @@ router.get('/countries/withoutdata', (req, res, next) => {
     });
 });
 
-//get data of a single country based on country code
-router.get('/country/:countryCode', (req, res, next) => {
-    Country.findOne({ countryCode: req.params.countryCode }, (err, countries) => {
-        if (err) return next(err);
-        res.json(countries);
-    });
+//get data of a single or multiple countries based on country code
+router.get('/country/code/:countryCode', (req, res, next) => {
+    let countries = req.params.countryCode.split("+");
+    countries = countries.map(code => Object.assign({}, { "countryCode": code }));
+    if (countries.length <= 1) {
+        Country.findOne(countries[0], (err, countries) => {
+            if (err) return next(err);
+            res.json(countries);
+        });
+    } else {
+        Country.find({ $or: countries }, (err, countries) => {
+            if (err) return next(err);
+            res.json(countries);
+        });
+    }
 });
 
-/*get data of two countries based on country code
-for example, data can be used for comparison*/
-router.get('/twocountries/code/:countryCode1.:countryCode2', (req, res, next) => {
-    Country.find({ $or: [{ countryCode: req.params.countryCode1 }, { countryCode: req.params.countryCode2 }] }, (err, countries) => {
-        if (err) return next(err);
-        res.json(countries);
-    });
-});
 
-/*get data of two countries based on country name
-for example, data can be used for comparison*/
-router.get('/twocountries/name/:name1.:name2', (req, res, next) => {
-    Country.find({ $or: [{ name: req.params.name1 }, { name: req.params.name2 }] }, (err, countries) => {
-        if (err) return next(err);
-        res.json(countries);
-    });
+//get data of a single or multiple countries based on country name
+router.get('/country/name/:name', (req, res, next) => {
+    let countries = req.params.name.split("_").join(" ");
+    countries = countries.split("+");
+    console.log(countries)
+    countries = countries.map(name => Object.assign({}, { "name": name }));
+    console.log(countries)
+    if (countries.length <= 1) {
+        Country.findOne(countries[0], (err, countries) => {
+            if (err) return next(err);
+            res.json(countries);
+        });
+    } else {
+        Country.find({ $or: countries }, (err, countries) => {
+            if (err) return next(err);
+            res.json(countries);
+        });
+    }
 });
 
 //get all the country codes
