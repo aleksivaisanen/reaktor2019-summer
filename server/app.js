@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
 const logger = require('morgan');
-const country = require('./routes/country');
+const country = require('../routes/country');
 
 const app = express();
 

@@ -2,7 +2,7 @@
  * Module dependencies.
  */
 
-const app = require('../app');
+const app = require('./app');
 const debug = require('debug')('mean-app:server');
 const http = require('http');
 const fs = require('fs');
