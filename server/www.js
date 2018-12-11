@@ -21,15 +21,20 @@ app.set('port', port);
 
 //connect to db
 const mongoose = require('mongoose');
-mongoose.Promise = require('bluebird');
-mongoose.connect('mongodb://localhost:27017/reaktor2019-summer', { promiseLibrary: require('bluebird') })
-  .then(() => {
-    console.log('Connection to DB successful!')
-    //get the population csv
-    populateDB("http://api.worldbank.org/v2/en/indicator/SP.POP.TOTL?downloadformat=csv", "./data/population-api.zip", "population");
-  })
-  .catch((err) => console.error(err));
 
+function connectToDBWithRetry() {
+  return mongoose.connect('mongodb://localhost:27017/reaktor2019-summer', { useNewUrlParser: true })
+    .then(function () {
+      console.log('Connection to DB successful!')
+      //get the population csv
+      populateDB("http://api.worldbank.org/v2/en/indicator/SP.POP.TOTL?downloadformat=csv", "./data/population-api.zip", "population");
+    })
+    .catch(function (err) {
+      console.error("Failed to connect to mongo on startup - retrying in 30 sec", err);
+      setTimeout(connectToDBWithRetry, 30000);
+    });
+}
+connectToDBWithRetry();
 
 
 //TODO error handling

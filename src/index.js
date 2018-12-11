@@ -9,22 +9,14 @@ import registerServiceWorker from './registerServiceWorker';
 import Footer from './components/Footer';
 import Header from './components/Header';
 
-import { createStore } from 'redux';
-import { Provider } from 'react-redux'
-import rootReducer from './reducers/rootReducer'
-
-export let store = createStore(rootReducer)
-
 ReactDOM.render(
-    <Provider store={store}>
-        <Router>
-            <div className="main-container">
-                <Route component={Header} />
-                <Route exact path='/' component={App} />
-                <Footer />
-            </div>
-        </Router>
-    </Provider>,
+    <Router>
+        <div className="main-container">
+            <Route component={Header} />
+            <Route exact path='/' component={App} />
+            <Footer />
+        </div>
+    </Router>,
     document.getElementById('root')
 );
 registerServiceWorker();

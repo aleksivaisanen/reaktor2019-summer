@@ -3,14 +3,16 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const logger = require('morgan');
 const country = require('../routes/country');
+//REMOVE CORS BEHORE PUBLISHING
+const cors = require('cors');
 
 const app = express();
 
-
+app.use(cors());
 app.use(logger('dev'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ 'extended': 'false' }));
-app.use(express.static(path.join(__dirname, 'build')));
+app.use(express.static(path.join(__dirname, '../build')));
 
 
 app.use('/api', country);

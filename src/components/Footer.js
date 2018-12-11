@@ -8,7 +8,7 @@ class Footer extends Component {
         return (
             <footer>
                 <Container>
-                    <p className="text-center"><a id="aleksilink" href="https://aleksivaisanen.github.io">Aleksi Väisänen design</a>
+                    <p className="text-center"><a id="aleksilink" href="https://aleksivaisanen.fi">Author: Aleksi Väisänen</a>
                         <br />
                         Reaktor 2019 Summer
                     </p>
